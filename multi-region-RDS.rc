@@ -1,0 +1,19 @@
+# This is an example configuration file for multi-region-RDS.sh script.
+# It should be renamed .multi-region-RDS.rc and placed in the $HOME of the user who runs the script.
+# The file should be owned by that user also, and the permissions should be 0600.
+# Every DB entry should have at least [name], [host], [user] and [pass] defined.
+# Source DBs could optionally have a table/view [ignore] list.
+
+# Declare asssociative arrays for every connection string (source or destination) needed
+
+# Create one entry for each source DB
+declare -A db1_src=([name]="mydb1" [host]="mydbserver1.example.com" [user]="root" [pass]="secretpass")
+declare -A db2_src=([name]="mydb2" [host]="mydbserver2.example.com" [user]="root" [pass]="secretpass" [ignore]="table1 table2 view1")
+
+# Create one entry for each destination DB
+declare -A db1_dst=([name]="standby1" [host]="mystandby1.example.com" [user]="root" [pass]="password")
+declare -A db2_dst=([name]="standby2" [host]="mystandby2.example.com" [user]="root" [pass]="password")
+
+# Declare the source and destination arrays paired in order
+declare -a dbs_src=("db1_src" "db2_src")
+declare -a dbs_dst=("db1_dst" "db2_dst")
