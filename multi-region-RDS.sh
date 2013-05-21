@@ -24,12 +24,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/.
 
-#SILENT="yes"
-SILENT="no"
+SILENT="yes"
+#SILENT="no"
 WORKDIR=/tmp/${0##*/}.temp.$$
 CONFIG="$HOME/.multi-region-RDS.rc"
-#DUMP_OPTS="--single-transaction --compress --add-drop-database --routines"
-DUMP_OPTS="--single-transaction --compress --add-drop-database"
+DUMP_OPTS="--single-transaction --compress --add-drop-database --routines"
 
 # Create WORKDIR if not present or not a directory
 if [ ! -e $WORKDIR ]; then
