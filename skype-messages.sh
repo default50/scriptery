@@ -11,5 +11,6 @@ SOUND="/usr/share/sounds/freedesktop/stereo/message.oga"
 
 if [[ "${1}" =~ $REGEX ]]; then
 	$PLAYER ${SOUND} &
-	notify-send "Mentioned!" "$2 mentioned you." -i skype
+	# This ↓ turned out to be too nagging
+	#notify-send "Mentioned!" "$2 mentioned you." -i skype -t 15000
 fi
