@@ -24,36 +24,42 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see http://www.gnu.org/licenses/.
 
+#set -x
+
 SILENT="yes"
 #SILENT="no"
 WORKDIR=/tmp/${0##*/}.temp.$$
+OUTPUT=$WORKDIR/output
 CONFIG="$HOME/.multi-region-RDS.rc"
 DUMP_OPTS="--single-transaction --compress --add-drop-database --routines"
+PATH=/home/deploy/.rbenv/shims:/home/deploy/.rbenv/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+SANITY_DIR=/var/www/apps/smrtouch/current
+
 
 # Create WORKDIR if not present or not a directory
 if [ ! -e $WORKDIR ]; then
-        mkdir $WORKDIR
+	mkdir $WORKDIR
 else
-        echo "ERROR: $WORKDIR already exists. Aborting."
-        exit 1
+	echo "ERROR: $WORKDIR already exists. Aborting."
+	exit 1
 fi
 
 if [ -f "$CONFIG" ]; then
-        if [ ! -O "$CONFIG" -o ! "$(stat -c %a $CONFIG)" -eq "600" ]; then
-                echo "ERROR: $CONFIG is not owned by $USER or its permissions are not 600. Aborting."
-                exit 1
-        else
-                . $CONFIG
-        fi
+	if [ ! -O "$CONFIG" -o ! "$(stat -c %a $CONFIG)" -eq "600" ]; then
+		echo "ERROR: $CONFIG is not owned by $USER or its permissions are not 600. Aborting."
+		exit 1
+	else
+  		. $CONFIG
+	fi
 else
-        echo "ERROR: $CONFIG file does not exist. Aborting."
-        exit 1
+	echo "ERROR: $CONFIG file does not exist. Aborting."
+	exit 1
 fi
 
 # Check if at least we have the same amount of sources and destinations
 if [ "${#dbs_src[@]}" -ne "${#dbs_dst[@]}" ]; then
-        echo "ERROR: Source and destination DBs not paired. Aborting."
-        exit 1
+	echo "ERROR: Source and destination DBs not paired. Aborting."
+	exit 1
 fi
 
 # Declare array to store references to the dump files in the order they were created
@@ -61,46 +67,64 @@ declare -a dbs_tmp=()
 
 # Function to dump the DB.
 dumpDB () {
-        eval "declare -A db="${1#*=}
-        local -a ignore=()
-        local index
-        # Check if we have some tables we should ignore
-        for index in "${!db[@]}"; do
-                if [ "$index" == "ignore" ]; then
-                        for i in ${db[$index]}; do
-                                ignore=("${ignore[@]}" "--ignore-table=${db[name]}.$i")
-                        done
-                fi
-        done
-        # Dump, ignoring if necessary
-        mysqldump -h ${db[host]} -u ${db[user]} -p${db[pass]} $DUMP_OPTS ${ignore[@]} --databases ${db[name]} | gzip > $WORKDIR/${db[name]}.gz
-        # If we ignored something add it to the dump but without data
-        if [ ${#ignore[@]} -gt 0 ]; then
-                mysqldump -h ${db[host]} -u ${db[user]} -p${db[pass]} $DUMP_OPTS --no-data ${db[name]} --tables ${db[ignore]} | gzip >> $WORKDIR/${db[name]}.gz
-        fi
-        # Save generated dump filename for reloading it afterwards
-        dbs_tmp=("${dbs_tmp[@]}" "$WORKDIR/${db[name]}.gz")
+	eval "declare -A db="${1#*=}
+	local -a ignore=()
+	local index
+	# Check if we have some tables we should ignore
+	for index in "${!db[@]}"; do
+		if [ "$index" == "ignore" ]; then
+			for i in ${db[$index]}; do
+				ignore=("${ignore[@]}" "--ignore-table=${db[name]}.$i")
+			done
+		fi
+	done
+	# Dump, ignoring if necessary
+	mysqldump -h ${db[host]} -u ${db[user]} -p${db[pass]} $DUMP_OPTS ${ignore[@]} --databases ${db[name]} | gzip > $WORKDIR/${db[name]}.gz
+	# If we ignored something add it to the dump but without data
+	if [ ${#ignore[@]} -gt 0 ]; then
+		mysqldump -h ${db[host]} -u ${db[user]} -p${db[pass]} $DUMP_OPTS --no-data ${db[name]} --tables ${db[ignore]} | gzip >> $WORKDIR/${db[name]}.gz
+	fi
+	# Save generated dump filename for reloading it afterwards
+	dbs_tmp=("${dbs_tmp[@]}" "$WORKDIR/${db[name]}.gz")
 }
 
 # Function to reload the DB
 reloadDB () {
-        eval "declare -A db="${1#*=}
-        # Reload the dump passed as argument
-        zcat ${dbs_tmp[$2]} | mysql -h ${db[host]} -u ${db[user]} -p${db[pass]} --compress
+	eval "declare -A db="${1#*=}
+	# Reload the dump passed as argument
+	zcat ${dbs_tmp[$2]} | mysql -h ${db[host]} -u ${db[user]} -p${db[pass]} --compress
 }
 
-# Iterate dumping and reloading each pair of instances
-element_count=${#dbs_src[@]}
-index=0
-while [ "$index" -lt "$element_count" ]; do
-        [ $SILENT != "yes" ] && echo -n "Starting dump of "$(eval echo '${'"${dbs_src[index]}"'[name]}')" at "$(date +%Y%m%d-%H%M%S)
-        dumpDB "$(declare -p ${dbs_src[index]})"
-        [ $SILENT != "yes" ] && echo " -> Done at "$(date +%Y%m%d-%H%M%S)". Dump size: "$(du -h ${dbs_tmp[index]} | cut -f1)
-        [ $SILENT != "yes" ] && echo -n "Starting reload of "$(eval echo '${'"${dbs_src[index]}"'[name]}')" at "$(date +%Y%m%d-%H%M%S)
-        reloadDB "$(declare -p ${dbs_dst[index]})" "$index"
-        [ $SILENT != "yes" ] && echo " -> Done at "$(date +%Y%m%d-%H%M%S)"."
-        ((index++))
-done
+# Function to determine DB sanity
+checkSanity () {
+	[ $SILENT != "yes" ] && echo -n "Starting sanity checks at "$(date +%Y%m%d-%H%M%S)
+	cd $SANITY_DIR
+	rake sanity:check &>$OUTPUT
+	local retval=$?
+	# If the sanity check doesn't end successfully print the error and exit immediately
+	[ $retval -ne 0 ] && echo -e "\n\nFAILED!!! Sanity check failed with the following output:\n\n$(cat $OUTPUT)" && exit 1
+	[ $SILENT != "yes" ] && echo " -> Done at "$(date +%Y%m%d-%H%M%S)"."
+	#[ $SILENT != "yes" ] && echo -e "\nSanity check had the following output:\n\n$(cat $OUTPUT)\n"
+}
+
+# Function to iterate dumping and reloading each pair of instances
+iteratorDB () {
+	element_count=${#dbs_src[@]}
+	index=0
+	while [ "$index" -lt "$element_count" ]; do
+		[ $SILENT != "yes" ] && echo -n "Starting dump of "$(eval echo '${'"${dbs_src[index]}"'[name]}')" at "$(date +%Y%m%d-%H%M%S)
+		dumpDB "$(declare -p ${dbs_src[index]})"
+		[ $SILENT != "yes" ] && echo " -> Done at $(date +%Y%m%d-%H%M%S). Dump size: "$(du -h ${dbs_tmp[index]} | cut -f1)
+		[ $SILENT != "yes" ] && echo -n "Starting reload of "$(eval echo '${'"${dbs_src[index]}"'[name]}')" at "$(date +%Y%m%d-%H%M%S)
+		reloadDB "$(declare -p ${dbs_dst[index]})" "$index"
+		[ $SILENT != "yes" ] && echo " -> Done at $(date +%Y%m%d-%H%M%S)."
+		((index++))
+	done
+}
+
+checkSanity
+
+iteratorDB
 
 # Clean up WORKDIR
 rm -Rf $WORKDIR
