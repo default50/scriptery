@@ -19,7 +19,8 @@ end
 
 ARGV.each do |file|
         if File.exists?(file)
-                CSV.foreach(file, {:col_sep => '|', :headers => false, :row_sep => :auto, :skip_blanks => true, :converters => lambda {|x| x.to_i }}) do |row|
+                reader = CSV.open(file, mode = 'rb', options = {:col_sep => '|', :headers => false, :row_sep => :auto, :skip_blanks => true, :converters => lambda {|x| x.to_i }})
+                reader.each do |row|
                         unless row[1] == '' || row[2] == '' || row[1].nil? || row[2].nil? || row[1] == 0 || row[2] == 0
                                 STDOUT.write(gen_redis_proto("SET","#{row[1]}","#{row[2]}"))
                         end     

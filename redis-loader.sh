@@ -51,7 +51,7 @@ for i in ${argv[@]}; do
 	# but go to the background so the job can continue
 	$LNP2REDIS $FIFO | redis-cli --pipe &
 	# Feed the $FIFO with uncompressed data
-	echo "gzip -d -c $i" >$FIFO
+	gzip -d -c $i > $FIFO
 done
 
 # Clean up WORKDIR
