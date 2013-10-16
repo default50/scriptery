@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # fs-builder.sh is a utility which should ease building FreeSWITCH Debian
-# packages. 
+# packages.
+# Loosely based on http://wiki.freeswitch.org/wiki/Debianbuild2 and 
+# https://github.com/traviscross/freeswitch-sounds/blob/master/debian/README.source
 # 
 # Copyright (C) 2013 Sebastian Cruz <default50@gmail.com>
 # 
