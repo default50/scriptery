@@ -71,8 +71,10 @@ buildFS() {
 	dpkg-buildpackage -b -us -uc -Zxz -z9
 	git reset --hard origin/master
 
-	mkdir ../freeswitch-debs-$FS_VERSION
-	mv *$FS_VERSION* ../freeswitch-debs-$FS_VERSION/
+	# Create debs dir if not existing
+	[ ! -d ../../freeswitch-debs_${FS_VERSION} ] && mkdir ../../freeswitch-debs_${FS_VERSION}
+
+	mv *$FS_VERSION* ../../freeswitch-debs_${FS_VERSION}/
 }
 
 # Dowload and build sounds
