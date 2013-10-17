@@ -1,0 +1,74 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          pentaho
+# Required-Start:    networking
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Pentaho BI Platform
+# Description:       Pentaho BI Platform
+# 
+### END INIT INFO
+
+# Author: Sebastian Cruz <default50@gmail.com>
+
+# Do NOT "set -e"
+
+export JAVA_HOME="/usr/lib/jvm/java-6-sun"
+export JRE_HOME="/usr/lib/jvm/java-6-sun/jre"
+PENTAHO_ADM="/opt/pentaho/administration-console"
+PENTAHO_BI="/opt/pentaho/biserver-ce"
+PENTAHO_LOG="/var/log/pentaho"
+
+
+start(){
+        if [ "$1" = "adm" ]; then
+                echo -n "Starting Pentaho administration-console... "
+                cd $PENTAHO_ADM
+                ./start-pac.sh >> $PENTAHO_LOG/pentaho_console.log 2>&1 &
+
+        else
+                echo -n "Starting Pentaho BI server... "
+                cd $PENTAHO_BI
+                ./start-pentaho.sh >> $PENTAHO_LOG/pentaho_biserver.log 2>&1
+        fi
+
+        echo "done."
+}
+
+stop(){
+        if [ "$1" = "adm" ]; then
+                echo -n "Stopping Pentaho administration-console... "
+                cd $PENTAHO_ADM
+                ./stop-pac.sh >> $PENTAHO_LOG/pentaho_console.log 2>&1 &
+        else
+                echo -n "Stopping Pentaho BI server... "
+                cd $PENTAHO_BI
+                ./stop-pentaho.sh >> $PENTAHO_LOG/pentaho_biserver.log 2>&1
+
+        fi
+
+        echo "done."
+}
+
+
+case "$1" in
+        start)
+        start $2
+        ;;
+        stop)
+        stop $2
+        ;;
+        restart)
+        stop $2
+        sleep 10
+        start $2
+        ;;
+        *)
+        echo "Usage: $0 {start|stop|restart} [For Pentaho BI server]" >&2
+        echo "Usage: $0 {start adm|stop adm|restart adm} [For Pentaho administration console]" >&2
+        exit 3
+        ;;
+esac
+
+exit 0
