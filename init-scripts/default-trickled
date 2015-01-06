@@ -1,0 +1,23 @@
+# The settings in this file are used by the program trickled as it is
+# packaged for Debian. It is not used by the upstream program trickled.
+
+# Uncomment if you want to run trickled upon bootup.
+# BEWARE: you should change TRICKLED_USER and TRICKLED_GROUP below.
+TRICKLED_ENABLED=true
+
+# Choose the user id running the daemon process.
+#DAEMON_USER=nobody
+
+# Choose the group id running the daemon process.
+#DAEMON_GROUP=nogroup
+
+# Configure a non-default location of the trickled's configuration file.
+#TRICKLED_CONF=/etc/trickled.conf
+
+# The trickled socket is used by all instances of 'trickle' that are not
+# running in standalone mode. You will need to specify this special location
+# with the "-n" parameter of trickle.
+#SOCKET=/var/run/trickled/trickled.socket
+
+# Additional options to pass to trickled
+TRICKLED_OPTS="-d 200 -u 200"
