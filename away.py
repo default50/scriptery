@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from dbus import SessionBus
+import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 import subprocess
 from gi.repository import TelepathyGLib as Tp
@@ -10,20 +10,23 @@ class Away:
         DBusGMainLoop(set_as_default=True)
         self.mem='ActiveChanged'
         self.dest='org.gnome.ScreenSaver'
-        self.bus=SessionBus()
+        self.bus=dbus.SessionBus()
         self.loop=MainLoop()
         self.bus.add_signal_receiver(self.catch,self.mem,self.dest)
+
     def catch(self,away):
         am = Tp.AccountManager.dup()
-        am.prepare_async(None, lambda *args: loop.quit(), None)
+        proxy_new = self.bus.get_object("org.mpris.MediaPlayer2.spotify", "/org/mpris/MediaPlayer2")
+        event_manager = dbus.Interface(proxy_new, 'org.mpris.MediaPlayer2.Player')
+        properties_manager = dbus.Interface(proxy_new, 'org.freedesktop.DBus.Properties')
         if away == 1: #Screensaver turned on
             print "Screen saver turned ON"
-            subprocess.call("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.PlayPause", shell=True)
+            event_manager.PlayPause()
             subprocess.call("xchat -e -c AWAY", shell=True)
             am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE, 'Offline', "")
         else: #Screensaver turned off
             subprocess.call("xchat -e -c BACK", shell=True)
-            subprocess.call("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.PlayPause", shell=True)
+            event_manager.PlayPause()
             am.set_all_requested_presences(Tp.ConnectionPresenceType.AVAILABLE, 'Available', "")
             print "Screen saver turned OFF"
 
