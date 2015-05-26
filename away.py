@@ -29,6 +29,8 @@ class Away:
             else:
               self.paused_before = True
             subprocess.call("xchat -e -c AWAY", shell=True)
+            #subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'open -a /Users/cruzseba/git/scripts/lockscreen'", shell=True)
+            subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'pmset displaysleepnow'", shell=True)
             am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE, 'Offline', "")
         else: #Screensaver turned off
             print "Screen saver turned OFF and Spotify was: " + status
