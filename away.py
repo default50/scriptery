@@ -28,14 +28,14 @@ class Away:
               event_manager.PlayPause()
             else:
               self.paused_before = True
-            subprocess.call("xchat -e -c AWAY", shell=True)
+            subprocess.call("hexchat -e -c AWAY", shell=True)
             #subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'open -a /Users/cruzseba/git/scripts/lockscreen'", shell=True)
             subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'pmset displaysleepnow'", shell=True)
             am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE, 'Offline', "")
         else: #Screensaver turned off
             print "Screen saver turned OFF and Spotify was: " + status
             #status = properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
-            subprocess.call("xchat -e -c BACK", shell=True)
+            subprocess.call("hexchat -e -c BACK", shell=True)
             if status == 'Paused' and not self.paused_before:
             #if properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus') == 'Paused' and not self.paused_before:
               event_manager.PlayPause()
