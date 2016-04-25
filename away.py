@@ -21,6 +21,8 @@ class Away:
         event_manager = dbus.Interface(proxy_new, 'org.mpris.MediaPlayer2.Player')
         properties_manager = dbus.Interface(proxy_new, 'org.freedesktop.DBus.Properties')
         status = properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
+        #This is useful if we need to override the previous variable because DBUS for Spotify starts misbehaving
+        #status = 'Paused'
         if away == 1: #Screensaver turned on
             print "Screen saver turned ON and Spotify was: " + status
             if status == 'Playing':
@@ -28,14 +30,14 @@ class Away:
               event_manager.PlayPause()
             else:
               self.paused_before = True
-            subprocess.call("xchat -e -c AWAY", shell=True)
+            subprocess.call("hexchat -e -c AWAY", shell=True)
+            subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'pmset displaysleepnow'", shell=True)
             am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE, 'Offline', "")
         else: #Screensaver turned off
             print "Screen saver turned OFF and Spotify was: " + status
             #status = properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
-            subprocess.call("xchat -e -c BACK", shell=True)
+            subprocess.call("hexchat -e -c BACK", shell=True)
             if status == 'Paused' and not self.paused_before:
-            #if properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus') == 'Paused' and not self.paused_before:
               event_manager.PlayPause()
             am.set_all_requested_presences(Tp.ConnectionPresenceType.AVAILABLE, 'Available', "")
 
