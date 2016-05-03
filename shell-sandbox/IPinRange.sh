@@ -25,24 +25,16 @@ mask=$((0xffffffff & (0xffffffff << (32 - ${3}))))
 # Function to convert an octect into binary
 d2b=({0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1})
 
-# Obtain binary representation of IP and network
-bip=$(printf '%s%s%s%s\n' "${d2b[$i1]}" "${d2b[$i2]}" "${d2b[$i3]}" "${d2b[$i4]}")
-bnet=$(printf '%s%s%s%s\n' "${d2b[$n1]}" "${d2b[$n2]}" "${d2b[$n3]}" "${d2b[$n4]}")
+# Obtain binary representation as text of IP and network and save it in binary format
+ip=$((2#$(printf '%s%s%s%s\n' "${d2b[$i1]}" "${d2b[$i2]}" "${d2b[$i3]}" "${d2b[$i4]}")))
+net=$((2#$(printf '%s%s%s%s\n' "${d2b[$n1]}" "${d2b[$n2]}" "${d2b[$n3]}" "${d2b[$n4]}")))
 
-printf 'Network\t%s\n' $(binprint $((2#$bnet)))
+printf 'Network\t%s\n' $(binprint $net)
 printf 'Mask\t\t\t\t%s\n' $(binprint $mask)
-printf 'IP\t\t\t\t%s\n' $(binprint $((2#$bip)))
-
-# Obtain decimal representation of IP, network and mask to be able to make binary operations
-dip=$((2#$bip))
-dnet=$((2#$bnet))
-
-# Obtain network address by &ing with the mask
-mip=$((dip & mask))
-mnet=$((dnet & mask))
+printf 'IP\t\t\t\t%s\n' $(binprint $ip)
 
 # Check that network portions match after masking
-if [ ${mip} != ${mnet} ]; then
+if [ $((ip & mask)) != $((net & mask)) ]; then
   printf "\n\nIP does NOT belong! (The network part is different)\n"
   exit 1
 else 
