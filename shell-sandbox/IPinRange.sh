@@ -30,8 +30,8 @@ bip=$(printf '%s%s%s%s\n' "${d2b[$i1]}" "${d2b[$i2]}" "${d2b[$i3]}" "${d2b[$i4]}
 bnet=$(printf '%s%s%s%s\n' "${d2b[$n1]}" "${d2b[$n2]}" "${d2b[$n3]}" "${d2b[$n4]}")
 
 printf 'Network\t%s\n' $(binprint $((2#$bnet)))
-printf 'Mask\t%s\n' $(binprint $mask)
-printf 'IP\t%s\n' $(binprint $((2#$bip)))
+printf 'Mask\t\t\t\t%s\n' $(binprint $mask)
+printf 'IP\t\t\t\t%s\n' $(binprint $((2#$bip)))
 
 # Obtain decimal representation of IP, network and mask to be able to make binary operations
 dip=$((2#$bip))
@@ -43,9 +43,9 @@ mnet=$((dnet & mask))
 
 # Check that network portions match after masking
 if [ ${mip} != ${mnet} ]; then
-  printf "\n\nIP does NOT belong! (The network part is different)"
+  printf "\n\nIP does NOT belong! (The network part is different)\n"
   exit 1
 else 
-  printf "\n\nIP is part of network! (The network part matches)"
+  printf "\n\nIP is part of network! (The network part matches)\n"
   exit 0
 fi
