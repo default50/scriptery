@@ -7,7 +7,7 @@
 
 #set -x
 
-# Function to print binary representation of decimal using bc, bash can't do it alone
+# Function to print binary representation of decimal using bc, bash would struggle with the method below for 32 bits
 function binprint () {
   # 32 chars long string, padded with 0s
   printf '%032s\n' $(bc <<< "obase=2;$1")
@@ -22,12 +22,13 @@ IFS=. read -r n1 n2 n3 n4 <<< "${2}"
 # Then trim the longer shifted mask by &ing it with the full mask (32 bits)
 mask=$((0xffffffff & (0xffffffff << (32 - ${3}))))
 
-# Function to convert an octect into binary
-d2b=({0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1})
+# Array filled with all binary numbers from 0 to 2^8 (255). Used brace expansion.
+o2b=({0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1}{0..1})
 
 # Obtain binary representation as text of IP and network and save it in binary format
-ip=$((2#$(printf '%s%s%s%s\n' "${d2b[$i1]}" "${d2b[$i2]}" "${d2b[$i3]}" "${d2b[$i4]}")))
-net=$((2#$(printf '%s%s%s%s\n' "${d2b[$n1]}" "${d2b[$n2]}" "${d2b[$n3]}" "${d2b[$n4]}")))
+# Done by searching each decimal octet as the index of the binary array "o2b"
+ip=$((2#$(printf '%s%s%s%s\n' "${o2b[$i1]}" "${o2b[$i2]}" "${o2b[$i3]}" "${o2b[$i4]}")))
+net=$((2#$(printf '%s%s%s%s\n' "${o2b[$n1]}" "${o2b[$n2]}" "${o2b[$n3]}" "${o2b[$n4]}")))
 
 printf 'Network\t%s\n' $(binprint $net)
 printf 'Mask\t\t\t\t%s\n' $(binprint $mask)
