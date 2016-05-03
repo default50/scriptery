@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Providing an IP address, a network and the CIDR prefix, define if the IP belongs to the range.
+# $1 = IP (e.g. 10.0.0.8)
+# $2 = Network IP (e.g. 10.0.0.0)
+# $3 = CIDR prefix (e.g. 24)
+
 #set -x
 
 # Function to print binary representation of decimal using bc, bash can't do it alone
