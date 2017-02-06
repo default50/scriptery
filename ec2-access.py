@@ -28,29 +28,34 @@ parser.add_argument('-p', '--profile', dest='profile',
                     help='Name of the AWS CLI profile to use.')
 args = parser.parse_args()
 
-try:
-    try:
-        ext_ip = subprocess.check_output(['dig', 'TXT', '+time=2', '+short',
-                                          'o-o.myaddr.l.google.com',
-                                          '@ns1.google.com'],
-                                         universal_newlines=True)
-    except subprocess.CalledProcessError as e:
-        print('Notice: Unable to obtain your external IP directly. Retrying '
-              'without specifying a name server.')
-        ext_ip = subprocess.check_output(['dig', 'TXT', '+time=2', '+short',
-                                          'o-o.myaddr.l.google.com'],
-                                         universal_newlines=True)
-except subprocess.CalledProcessError as e:
-    pass
-finally:
-    if not ext_ip:
-        print('Error: Unable to obtain your external IP!')
-        raise SystemError
-    ip_cidr = ext_ip.strip('[^\"]|[\"\n$]') + '/32'
-    print('Your public IP CIDR is:', ip_cidr)
-
 session = boto3.Session(profile_name=args.profile)
 client = session.client('ec2')
+
+
+def get_ip():
+    try:
+        try:
+            ext_ip = subprocess.check_output(['dig', 'TXT',
+                                              '+time=2', '+short',
+                                              'o-o.myaddr.l.google.com',
+                                              '@ns1.google.com'],
+                                             universal_newlines=True)
+        except subprocess.CalledProcessError:
+            print('Notice: Unable to obtain your external IP directly. '
+                  'Retrying without specifying a name server.')
+            ext_ip = subprocess.check_output(['dig', 'TXT',
+                                              '+time=2', '+short',
+                                              'o-o.myaddr.l.google.com'],
+                                             universal_newlines=True)
+    except subprocess.CalledProcessError:
+        pass
+    finally:
+        if not ext_ip:
+            print('Error: Unable to obtain your external IP!')
+            raise SystemError
+        ip_cidr = ext_ip.strip('[^\"]|[\"\n$]') + '/32'
+        print('Your public IP CIDR is:', ip_cidr)
+        return ip_cidr
 
 
 def get_rules(sg_id):
@@ -109,7 +114,7 @@ if args.action == 'start':
             get_rules(args.sg_id)['SecurityGroups'][0]['IpPermissions']
     if ip_permissions:
         revoke_rules(args.sg_id, ip_permissions)
-    auth_ip(args.sg_id, ip_cidr)
+    auth_ip(args.sg_id, get_ip())
     start(args.instance_id)
 elif args.action == 'stop':
     ip_permissions =\
