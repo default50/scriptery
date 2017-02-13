@@ -1,44 +1,55 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 import subprocess
-from gi.repository import TelepathyGLib as Tp
-from gi.repository.GObject import MainLoop
+import gi
+gi.require_version('TelepathyGLib', '0.12')
+from gi.repository import TelepathyGLib as Tp  # noqa
+from gi.repository.GObject import MainLoop  # noqa
+
 
 class Away:
     def __init__(self):
         DBusGMainLoop(set_as_default=True)
-        self.mem='ActiveChanged'
-        self.dest='org.gnome.ScreenSaver'
-        self.bus=dbus.SessionBus()
-        self.loop=MainLoop()
-        self.bus.add_signal_receiver(self.catch,self.mem,self.dest)
+        self.mem = 'ActiveChanged'
+        self.dest = 'org.gnome.ScreenSaver'
+        self.bus = dbus.SessionBus()
+        self.loop = MainLoop()
+        self.bus.add_signal_receiver(self.catch, self.mem, self.dest)
         self.paused_before = False
 
-    def catch(self,away):
+    def catch(self, away):
         am = Tp.AccountManager.dup()
-        proxy_new = self.bus.get_object("org.mpris.MediaPlayer2.spotify", "/org/mpris/MediaPlayer2")
-        event_manager = dbus.Interface(proxy_new, 'org.mpris.MediaPlayer2.Player')
-        properties_manager = dbus.Interface(proxy_new, 'org.freedesktop.DBus.Properties')
-        status = properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
-        #This is useful if we need to override the previous variable because DBUS for Spotify starts misbehaving
-        #status = 'Paused'
-        if away == 1: #Screensaver turned on
-            print "Screen saver turned ON and Spotify was: " + status
+        proxy_new = self.bus.get_object("org.mpris.MediaPlayer2.spotify",
+                                        "/org/mpris/MediaPlayer2")
+        event_manager = dbus.Interface(proxy_new,
+                                       'org.mpris.MediaPlayer2.Player')
+        properties_manager = dbus.Interface(proxy_new,
+                                            'org.freedesktop.DBus.Properties')
+        status = properties_manager.Get('org.mpris.MediaPlayer2.Player',
+                                        'PlaybackStatus')
+
+        if away == 1:  # Screensaver turned on
+            print("Screen saver turned ON and Spotify was: {} ".format(status))
             if status == 'Playing':
-              self.paused_before = False
-              event_manager.PlayPause()
+                self.paused_before = False
+                event_manager.PlayPause()
             else:
-              self.paused_before = True
+                self.paused_before = True
             subprocess.call("hexchat -e -c AWAY", shell=True)
-            subprocess.call("ssh cruzseba-laptop.aka.amazon.com 'pmset displaysleepnow'", shell=True)
-            am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE, 'Offline', "")
-        else: #Screensaver turned off
-            print "Screen saver turned OFF and Spotify was: " + status
-            #status = properties_manager.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
+            subprocess.call(
+                "ssh cruzseba-laptop.aka.amazon.com 'pmset displaysleepnow'",
+                shell=True)
+            am.set_all_requested_presences(Tp.ConnectionPresenceType.OFFLINE,
+                                           'Offline', "")
+        else:  # Screensaver turned off
+            print(
+                "Screen saver turned OFF and Spotify was: {} ".format(status))
             subprocess.call("hexchat -e -c BACK", shell=True)
             if status == 'Paused' and not self.paused_before:
-              event_manager.PlayPause()
-            am.set_all_requested_presences(Tp.ConnectionPresenceType.AVAILABLE, 'Available', "")
+                event_manager.PlayPause()
+            am.set_all_requested_presences(Tp.ConnectionPresenceType.AVAILABLE,
+                                           'Available', "")
+
 
 Away().loop.run()
