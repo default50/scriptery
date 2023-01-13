@@ -43,7 +43,17 @@ fastboot erase cache
 fastboot flash cache cache.img
 fastboot flash system system.img
 
+# Flash recovery because it always break
+fastboot flash recovery twrp-3.0.2-0-shamu.img
+
+# Would need to find a way to install SuperSU here, maybe sideloading the zip and then issuing a TWRP command?
+
+#reboot?
+fastboot reboot
+
 cd ..
+
+# Need to do clean-up
 
 # Need to test if this can be done immediately after flashing system, without reboot
 #fastboot flash recovery twrp-3.0.2-0-shamu.img
