@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Firefox magic!
+
+set -euo pipefail
+# set -x
+
+POLICIES="/Applications/Firefox.app/Contents/Resources/distribution/policies.json"
+FF_PROFILE="CruX"
+
+if [[ -f "${POLICIES}" ]]; then
+    echo "ERROR! Policies file exists and shouldn't!"
+    echo "${POLICIES}"
+    exit 1
+else
+    echo "MAGIC!"
+    echo "{}" > "${POLICIES}"
+    /Applications/Firefox.app/Contents/MacOS/firefox -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
+    sleep 5
+    rm "${POLICIES}"
+fi
