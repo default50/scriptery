@@ -12,10 +12,17 @@ if [[ -f "${POLICIES}" ]]; then
     echo "ERROR! Policies file exists and shouldn't!"
     echo "${POLICIES}"
     exit 1
-else
-    echo "MAGIC!"
-    echo "{}" > "${POLICIES}"
-    /Applications/Firefox.app/Contents/MacOS/firefox -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
-    sleep 5
-    rm "${POLICIES}"
 fi
+
+if [[ ! -d "/Applications/Firefox.app/Contents/Resources/distribution/" ]]; then
+    policies_dir=$(dirname ${POLICIES})
+    echo "WARNING! Policies dir didn't exist and should!"
+    mkdir -p "${policies_dir}"
+    echo "Created ${policies_dir}"
+fi
+
+echo "MAGIC!"
+echo "{}" > "${POLICIES}"
+/Applications/Firefox.app/Contents/MacOS/firefox -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
+sleep 5
+rm "${POLICIES}"
