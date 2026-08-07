@@ -1,28 +1,131 @@
 #!/bin/bash
 
 # Firefox magic!
+# Used to move policies.json around. That is not working anymore.
+# And moving the plist aside isn't enough:
+#   Firefox reads these via CFPreferencesCopyAppValue, whose values are served
+#   (and cached in memory) by cfprefsd. We must flush cfprefsd after moving the
+#   files so the removal actually takes effect, then restore + flush again.
 
-set -euo pipefail
-# set -x
+set -uo pipefail
 
-POLICIES="/Applications/Firefox.app/Contents/Resources/distribution/policies.json"
 FF_PROFILE="CruX"
+FF_BIN="/Applications/Firefox.app/Contents/MacOS/firefox"
+SYS_PLIST="/Library/Managed Preferences/org.mozilla.firefox.plist"
+USR_PLIST="/Library/Managed Preferences/${USER}/org.mozilla.firefox.plist"
 
-if [[ -f "${POLICIES}" ]]; then
-    echo "ERROR! Policies file exists and shouldn't!"
-    echo "${POLICIES}"
-    exit 1
+DEBUG=0
+for arg in "$@"; do
+    case "${arg}" in
+        --debug) DEBUG=1 ;;
+        -h|--help)
+            echo "Usage: ${0##*/} [--debug]"
+            echo "  --debug  Report whether managed policies are still forced after the flush."
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: ${arg}" >&2
+            echo "Usage: ${0##*/} [--debug]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Run a /bin/sh command string as root.
+#
+# Preference order:
+#   1. sudo, when we already hold cached credentials or have a terminal to
+#      prompt in. With Touch ID enabled for sudo (pam_tid in sudo_local) this
+#      authenticates by fingerprint.
+#   2. sudo without a terminal (launched from FF.app / Spotlight): still worth
+#      trying, because pam_tid presents its Touch ID sheet as a GUI prompt that
+#      needs no tty. If Touch ID succeeds we never touch a password field.
+#   3. osascript "with administrator privileges" as a last resort — a
+#      password-only dialog — for when Touch ID is unavailable or cancelled.
+#
+# All privileged work is done in a SINGLE as_root call (see the privileged
+# session below) so there is at most one prompt.
+as_root() {
+    if sudo -n true 2>/dev/null || [[ -t 1 ]]; then
+        sudo /bin/sh -c "$1"
+        return
+    fi
+
+    # No terminal: let pam_tid try Touch ID (GUI sheet, no tty required). On
+    # failure sudo can't fall back to a password prompt here, so it just errors
+    # out quickly and we drop to the osascript dialog below.
+    if sudo /bin/sh -c "$1" 2>/dev/null; then
+        return
+    fi
+
+    local esc=${1//\\/\\\\}   # escape backslashes for AppleScript
+    esc=${esc//\"/\\\"}       # escape double quotes for AppleScript
+    /usr/bin/osascript -e "do shell script \"${esc}\" with administrator privileges"
+}
+
+# Reports whether Firefox still sees a forced value for a policy key.
+check_forced() {
+    if defaults read "/Library/Managed Preferences/org.mozilla.firefox" "$1" >/dev/null 2>&1; then
+        echo "forced"
+    else
+        echo "clear"
+    fi
+}
+
+# Seconds to keep the prefs moved aside — long enough for Firefox to start and
+# read policies before we restore them.
+READ_DELAY=10
+# Marker file the privileged session touches once the plists are moved aside,
+# so we only launch Firefox after the bypass is actually in effect. Lives under
+# the user's TMPDIR so we can clean it up even though root creates it.
+MARKER="$(mktemp -u "${TMPDIR:-/tmp}/ff-moved.XXXXXX")"
+
+# The entire privileged sequence as one /bin/sh script: move the managed prefs
+# aside, flush cfprefsd, signal readiness, wait for Firefox to read policies,
+# then restore and flush again. Inner traps guarantee the restore runs even if
+# the session is interrupted. Running this as a single elevation means exactly
+# one auth prompt.
+PRIV_SESSION="trap 'mv \"${SYS_PLIST}.bak\" \"${SYS_PLIST}\" 2>/dev/null; mv \"${USR_PLIST}.bak\" \"${USR_PLIST}\" 2>/dev/null; killall cfprefsd 2>/dev/null' EXIT
+trap 'exit 130' INT TERM
+mv \"${SYS_PLIST}\" \"${SYS_PLIST}.bak\" 2>/dev/null || true
+mv \"${USR_PLIST}\" \"${USR_PLIST}.bak\" 2>/dev/null || true
+killall cfprefsd 2>/dev/null || true
+sleep 1
+touch \"${MARKER}\"
+sleep ${READ_DELAY}"
+
+# Prime sudo once in the foreground so the backgrounded elevation below never
+# has to prompt from the background (where it can't). No-op without a terminal;
+# that path uses the osascript GUI dialog instead.
+if [[ -t 1 ]]; then
+    sudo -v || { echo "Authentication failed." >&2; exit 1; }
 fi
 
-if [[ ! -d "/Applications/Firefox.app/Contents/Resources/distribution/" ]]; then
-    policies_dir=$(dirname ${POLICIES})
-    echo "WARNING! Policies dir didn't exist and should!"
-    mkdir -p "${policies_dir}"
-    echo "Created ${policies_dir}"
+echo "Moving managed prefs aside (authenticate once if prompted)..."
+as_root "${PRIV_SESSION}" &
+PRIV_PID=$!
+
+# Wait (up to ~10s) for the privileged session to move the plists aside.
+for _ in $(seq 1 100); do
+    [[ -e "${MARKER}" ]] && break
+    sleep 0.1
+done
+if [[ ! -e "${MARKER}" ]]; then
+    echo "WARNING: managed prefs may not have been moved aside (auth cancelled?)." >&2
 fi
 
-echo "MAGIC!"
-echo "{}" > "${POLICIES}"
-/Applications/Firefox.app/Contents/MacOS/firefox -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
-sleep 5
-rm "${POLICIES}"
+if [[ "${DEBUG}" -eq 1 ]]; then
+    STATE=$(check_forced EnterprisePoliciesEnabled)
+    echo "EnterprisePoliciesEnabled is now: ${STATE}"
+    if [[ "${STATE}" != "clear" ]]; then
+        echo "WARNING: policies still forced — bypass may not take effect."
+    fi
+fi
+
+echo "Launching Firefox..."
+"${FF_BIN}" -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
+
+# Wait for the privileged session to finish restoring, then clean up.
+wait "${PRIV_PID}"
+rm -f "${MARKER}"
+echo "Managed prefs restored."
