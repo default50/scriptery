@@ -30,13 +30,16 @@ It can also be launched from Spotlight via a small wrapper app (see
 
 Edit these at the top of the script:
 
-| Variable      | Default                                                    | Meaning |
-|---------------|------------------------------------------------------------|---------|
-| `FF_PROFILE`  | `CruX`                                                     | Firefox profile to launch. |
-| `FF_BIN`      | `/Applications/Firefox.app/Contents/MacOS/firefox`         | Firefox binary. |
-| `SYS_PLIST`   | `/Library/Managed Preferences/org.mozilla.firefox.plist`   | System-level managed prefs. |
-| `USR_PLIST`   | `/Library/Managed Preferences/$USER/org.mozilla.firefox.plist` | Per-user managed prefs. |
-| `READ_DELAY`  | `10`                                                       | Seconds the prefs stay moved aside — long enough for Firefox to start and read policies. Bump it if Firefox is slow to launch on your machine. |
+- `FF_PROFILE` — Firefox profile to launch. Default `CruX`.
+- `FF_BIN` — Firefox binary. Default
+  `/Applications/Firefox.app/Contents/MacOS/firefox`.
+- `SYS_PLIST` — system-level managed prefs. Default
+  `/Library/Managed Preferences/org.mozilla.firefox.plist`.
+- `USR_PLIST` — per-user managed prefs. Default
+  `/Library/Managed Preferences/$USER/org.mozilla.firefox.plist`.
+- `READ_DELAY` — seconds the prefs stay moved aside, long enough for Firefox
+  to start and read policies. Default `10`; bump it if Firefox is slow to
+  launch on your machine.
 
 ## How it works
 
@@ -127,7 +130,7 @@ sudo sed -i '' 's/^#auth/auth/' /etc/pam.d/sudo_local
 
 Result (`cat /etc/pam.d/sudo_local`):
 
-```
+```text
 auth       sufficient     pam_tid.so
 ```
 
@@ -140,6 +143,7 @@ sudo -k && sudo -v   # should show a Touch ID prompt, not a password field
 To undo: `sudo rm /etc/pam.d/sudo_local`.
 
 Notes:
+
 - Confirmed: `pam_tid` fires even when `sudo` is invoked from a GUI-launched
   process with no tty (i.e. the Spotlight/FF.app path), so Touch ID works there
   too.
@@ -149,22 +153,79 @@ Notes:
 
 ## The FF.app wrapper
 
-`/Applications/FF.app` is a thin **Automator "Application" applet** (bundle id
-`com.apple.automator.FF`, `LSUIElement` so it runs headless) whose single "Run
-Shell Script" action just calls this script:
+`FF.app` is a tiny launcher app whose only job is to run this script, so it can
+be started from Spotlight or Finder instead of a terminal. It runs the exact
+same `ff` logic — there is nothing app-specific to maintain inside it.
 
+### Recreating it on a new machine
+
+Use the bundled installer, which rebuilds the app from scratch with `osacompile`
+and points it at the `ff` script next to it:
+
+```bash
+./install-ff-app.sh                       # installs /Applications/FF.app
+./install-ff-app.sh ~/Applications/FF.app # or a custom location
 ```
-COMMAND_STRING = /Users/cruzseba/git/git-legacy/scriptery/ff
+
+It generates an AppleScript applet equivalent to:
+
+```applescript
+do shell script "/absolute/path/to/ff"
+```
+
+sets `LSUIElement` (no Dock icon), applies the bundled icon, and installs the
+bundle (using `sudo` only if the destination isn't writable). The script path is
+baked in at install time from wherever the repo lives, so re-run the installer
+if you move the repo.
+
+> An `.app` is a generated, code-signed bundle, so it isn't committed to the
+> repo directly — the installer is the source of truth instead.
+
+### The icon
+
+The launcher's icon is preserved in the repo as **`ff-app.icns`** and applied by
+the installer, which copies it over the applet's `applet.icns` (referenced by
+`CFBundleIconFile`).
+
+There's a catch: `osacompile` also ships an **asset catalog** (`Assets.car` plus
+a `CFBundleIconName` key), and on modern macOS that asset-catalog icon *wins*
+over `CFBundleIconFile`. So the installer also **removes `CFBundleIconName` and
+`Assets.car`**, making `CFBundleIconFile` authoritative, then re-signs the
+bundle ad-hoc (editing Info.plist / Resources invalidates the signature) and
+runs `lsregister -f` to force LaunchServices to pick up the new icon.
+
+`ff-app.icns` itself was extracted from the original app's Finder custom icon
+(a `kHasCustomIcon` flag plus an `Icon\r` resource fork). Using `CFBundleIconFile`
+instead of re-applying that resource-fork custom icon keeps the mechanism clean
+and bundle-local. If an old icon still lingers after reinstall: `killall Dock
+Finder`.
+
+To update the icon, replace `ff-app.icns` (a 1024×1024 `.icns`) and re-run the
+installer.
+
+### The original applet (for reference)
+
+The first version was an **Automator "Application"** (bundle id
+`com.apple.automator.FF`, `LSUIElement`) with a single **Run Shell Script**
+action:
+
+```text
+COMMAND_STRING = /path/to/scriptery/ff-scripts/ff
 shell          = /bin/zsh
 ```
 
-So the app and `./ff` run the exact same logic; there's nothing to maintain in
-the app itself. If you move this script, update the applet's `COMMAND_STRING`
-(open `FF.app` in Automator, or edit `FF.app/Contents/document.wflow`).
+To recreate that flavor by hand: open **Automator** → **New** →
+**Application** → add **Run Shell Script** → set shell to `/bin/zsh` and body
+to the absolute path of `ff` → save as `FF.app` to `/Applications`. The
+`osacompile` installer above is the reproducible equivalent and is preferred.
 
-If the app ever appears to do nothing, check that it (or `osascript`) has the
-macOS permissions needed to touch `/Library/Managed Preferences` — Full Disk
-Access can be required.
+### Permissions
+
+If the app appears to do nothing, check that it (or `osascript`) has the macOS
+permissions needed to touch `/Library/Managed Preferences` — **Full Disk
+Access** may be required (System Settings → Privacy & Security → Full Disk
+Access). Touch ID on this path needs `pam_tid` enabled (see
+[Authentication](#authentication-touch-id)).
 
 ## Troubleshooting
 
