@@ -10,7 +10,7 @@
 set -uo pipefail
 
 FF_PROFILE="CruX"
-FF_BIN="/Applications/Firefox.app/Contents/MacOS/firefox"
+FF_APP="/Applications/Firefox.app"
 SYS_PLIST="/Library/Managed Preferences/org.mozilla.firefox.plist"
 USR_PLIST="/Library/Managed Preferences/${USER}/org.mozilla.firefox.plist"
 
@@ -123,7 +123,11 @@ if [[ "${DEBUG}" -eq 1 ]]; then
 fi
 
 echo "Launching Firefox..."
-"${FF_BIN}" -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1 &
+# Start Firefox through LaunchServices rather than exec'ing the binary. As a
+# direct child, macOS 27 attributes Firefox's file access to the launching app
+# (FF.app / the terminal), which then needs Full Disk Access to read the profile.
+# Via `open`, Firefox is its own responsible process and needs no such grant.
+/usr/bin/open -n -a "${FF_APP}" --args -P "${FF_PROFILE}" -new-instance >/dev/null 2>&1
 
 # Wait for the privileged session to finish restoring, then clean up.
 wait "${PRIV_PID}"

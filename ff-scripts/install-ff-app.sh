@@ -21,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FF_SCRIPT="${SCRIPT_DIR}/ff"
 FF_ICON="${SCRIPT_DIR}/ff-app.icns"
 APP_PATH="${1:-/Applications/FF.app}"
+BUNDLE_ID="local.cruzseba.FF"
 
 if [[ ! -x "${FF_SCRIPT}" ]]; then
     echo "ERROR: ff script not found or not executable at ${FF_SCRIPT}" >&2
@@ -43,6 +44,14 @@ if ! /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" \
         "${BUILD_APP}/Contents/Info.plist"
 fi
 
+# Give the applet a real bundle identifier (osacompile leaves it unset) so macOS
+# privacy prompts and settings can identify the app.
+if ! /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" \
+        "${BUILD_APP}/Contents/Info.plist" 2>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" \
+        "${BUILD_APP}/Contents/Info.plist"
+fi
+
 # Apply the preserved app icon, if present.
 #
 # osacompile ships TWO icon mechanisms: the loose applet.icns (referenced by
@@ -62,11 +71,15 @@ if [[ -f "${FF_ICON}" ]]; then
         /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string applet" \
             "${BUILD_APP}/Contents/Info.plist"
     fi
-    # Re-seal the bundle: editing Info.plist / Resources invalidates the ad-hoc
-    # signature osacompile applied.
-    codesign --force --sign - "${BUILD_APP}" 2>/dev/null || true
 else
     echo "WARNING: ${FF_ICON} not found; app will use the default applet icon." >&2
+fi
+
+# Re-seal the bundle: editing Info.plist / Resources invalidates the ad-hoc
+# signature osacompile applied. Always sign, since the plist was edited above.
+if ! codesign --force --sign - "${BUILD_APP}"; then
+    echo "ERROR: codesign failed." >&2
+    exit 1
 fi
 
 # Install, elevating only if the destination isn't writable.
